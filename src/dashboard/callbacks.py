@@ -4,6 +4,12 @@ import os
 from dash import Input, Output, State
 from datetime import datetime, timedelta
 from src.utils.logger import log
+from src.dashboard.layouts import (
+    create_overview_tab,
+    create_sentiment_tab,
+    create_burnout_tab,
+    create_alerts_tab
+)
 
 # Lazy imports for data provider and chart generator
 _data_provider = None
