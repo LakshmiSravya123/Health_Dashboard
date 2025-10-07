@@ -95,12 +95,13 @@ def register_callbacks(app):
         [Input('interval-component', 'n_intervals'),
          Input('refresh-button', 'n_clicks'),
          Input('date-range', 'start_date'),
-         Input('date-range', 'end_date')]
+         Input('date-range', 'end_date'),
+         Input('risk-filter', 'value')]
     )
-    def update_risk_distribution(n_intervals, n_clicks, start_date, end_date):
+    def update_risk_distribution(n_intervals, n_clicks, start_date, end_date, risk_level):
         """Update risk distribution chart."""
         try:
-            data = data_provider.get_risk_distribution(start_date, end_date)
+            data = data_provider.get_risk_distribution(start_date, end_date, risk_level)
             return chart_gen.create_risk_distribution_chart(data)
         except Exception as e:
             log.error(f"Error updating risk distribution: {str(e)}")
@@ -127,12 +128,13 @@ def register_callbacks(app):
         Output('sentiment-distribution-chart', 'figure'),
         [Input('interval-component', 'n_intervals'),
          Input('date-range', 'start_date'),
-         Input('date-range', 'end_date')]
+         Input('date-range', 'end_date'),
+         Input('sentiment-filter', 'value')]
     )
-    def update_sentiment_distribution(n_intervals, start_date, end_date):
+    def update_sentiment_distribution(n_intervals, start_date, end_date, sentiment_label):
         """Update sentiment distribution chart."""
         try:
-            data = data_provider.get_sentiment_distribution(start_date, end_date)
+            data = data_provider.get_sentiment_distribution(start_date, end_date, sentiment_label)
             return chart_gen.create_sentiment_distribution_chart(data)
         except Exception as e:
             log.error(f"Error updating sentiment distribution: {str(e)}")
@@ -173,12 +175,13 @@ def register_callbacks(app):
         Output('burnout-heatmap', 'figure'),
         [Input('interval-component', 'n_intervals'),
          Input('date-range', 'start_date'),
-         Input('date-range', 'end_date')]
+         Input('date-range', 'end_date'),
+         Input('risk-filter', 'value')]
     )
-    def update_burnout_heatmap(n_intervals, start_date, end_date):
+    def update_burnout_heatmap(n_intervals, start_date, end_date, risk_level):
         """Update burnout risk heatmap."""
         try:
-            data = data_provider.get_burnout_heatmap_data(start_date, end_date)
+            data = data_provider.get_burnout_heatmap_data(start_date, end_date, risk_level)
             return chart_gen.create_burnout_heatmap(data)
         except Exception as e:
             log.error(f"Error updating burnout heatmap: {str(e)}")

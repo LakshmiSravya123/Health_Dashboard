@@ -1,5 +1,7 @@
 """Data provider for dashboard queries."""
 
+import json
+from collections import Counter
 import pandas as pd
 from datetime import datetime
 from typing import Dict, Any, List
@@ -75,12 +77,12 @@ class DashboardDataProvider:
         
         sql = f"""
         SELECT
-            DATE(p.timestamp) as date,
+            substr(p.timestamp, 1, 10) as date,
             AVG(p.sentiment_score) as avg_sentiment,
             COUNT(*) as post_count
         FROM processed_sentiment_data p
         JOIN raw_sentiment_data r ON p.record_id = r.record_id
-        WHERE DATE(p.timestamp) BETWEEN '{start_date}' AND '{end_date}'
+        WHERE p.timestamp >= '{start_date} 00:00:00' AND p.timestamp <= '{end_date} 23:59:59'
             {sources_filter}
         GROUP BY date
         ORDER BY date
@@ -92,7 +94,7 @@ class DashboardDataProvider:
             log.error(f"Error getting sentiment trend: {str(e)}")
             return pd.DataFrame()
     
-    def get_risk_distribution(self, start_date: str, end_date: str) -> pd.DataFrame:
+    def get_risk_distribution(self, start_date: str, end_date: str, risk_level: str = 'all') -> pd.DataFrame:
         """Get distribution of risk levels.
         
         Args:
@@ -102,12 +104,14 @@ class DashboardDataProvider:
         Returns:
             DataFrame with risk distribution
         """
+        risk_filter = "" if (not risk_level or risk_level == 'all') else f"AND risk_level = '{risk_level}'"
         sql = f"""
         SELECT
             risk_level,
             COUNT(*) as count
         FROM burnout_predictions
-        WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
+        WHERE prediction_date >= '{start_date}' AND prediction_date <= '{end_date}'
+            {risk_filter}
         GROUP BY risk_level
         ORDER BY
             CASE risk_level
@@ -129,19 +133,69 @@ class DashboardDataProvider:
         start_date: str,
         end_date: str
     ) -> pd.DataFrame:
-        """Get mental health indicators over time.
+        """Get mental health indicators over time (SQLite-friendly).
         
-        Args:
-            start_date: Start date
-            end_date: End date
-            
-        Returns:
-            DataFrame with indicator trends
+        We pull rows and aggregate in Python by parsing JSON strings from
+        `mental_health_indicators`.
         """
-        # Simplified - returns empty for now (JSON parsing complex in SQLite)
-        # TODO: Implement JSON parsing for SQLite if needed
+        sql = f"""
+        SELECT substr(timestamp, 1, 10) AS date, mental_health_indicators
+        FROM processed_sentiment_data
+        WHERE timestamp >= '{start_date} 00:00:00' AND timestamp <= '{end_date} 23:59:59'
+        ORDER BY date
+        """
         try:
-            return pd.DataFrame(columns=['date', 'stress', 'anxiety', 'depression', 'burnout'])
+            df = self.loader.query(sql)
+            if df.empty:
+                return pd.DataFrame()
+            # Parse JSON safely
+            def parse_ind(row):
+                v = row
+                if isinstance(v, dict):
+                    return v
+                if isinstance(v, str) and v:
+                    try:
+                        parsed = json.loads(v)
+                        # Only accept object (dict); otherwise fallback to empty dict
+                        return parsed if isinstance(parsed, dict) else {}
+                    except Exception:
+                        return {}
+                # Any other type (float/None/etc.) -> empty dict
+                return {}
+            df['parsed'] = df['mental_health_indicators'].apply(parse_ind)
+            # Build aggregate per date
+            agg = (
+                df.groupby('date')['parsed']
+                .apply(lambda xs: {
+                    'stress': pd.Series([
+                        x.get('stress_score', 0) if isinstance(x, dict) else 0 for x in xs
+                    ]).mean() if len(xs) else 0,
+                    'anxiety': pd.Series([
+                        x.get('anxiety_score', 0) if isinstance(x, dict) else 0 for x in xs
+                    ]).mean() if len(xs) else 0,
+                    'depression': pd.Series([
+                        x.get('depression_score', 0) if isinstance(x, dict) else 0 for x in xs
+                    ]).mean() if len(xs) else 0,
+                    'burnout': pd.Series([
+                        x.get('burnout_score', 0) if isinstance(x, dict) else 0 for x in xs
+                    ]).mean() if len(xs) else 0,
+                })
+                .reset_index(name='vals')
+            )
+            # Expand dict into columns with robust guards
+            def _safe(d, key):
+                if isinstance(d, dict):
+                    return d.get(key, 0)
+                return 0
+            out = pd.concat([
+                agg['date'],
+                agg['vals'].apply(lambda d: _safe(d, 'stress')),
+                agg['vals'].apply(lambda d: _safe(d, 'anxiety')),
+                agg['vals'].apply(lambda d: _safe(d, 'depression')),
+                agg['vals'].apply(lambda d: _safe(d, 'burnout')),
+            ], axis=1)
+            out.columns = ['date', 'stress', 'anxiety', 'depression', 'burnout']
+            return out
         except Exception as e:
             log.error(f"Error getting mental health indicators: {str(e)}")
             return pd.DataFrame()
@@ -149,7 +203,8 @@ class DashboardDataProvider:
     def get_sentiment_distribution(
         self,
         start_date: str,
-        end_date: str
+        end_date: str,
+        sentiment_label: str = 'all'
     ) -> pd.DataFrame:
         """Get sentiment label distribution.
         
@@ -160,12 +215,14 @@ class DashboardDataProvider:
         Returns:
             DataFrame with sentiment distribution
         """
+        sentiment_filter = "" if (not sentiment_label or sentiment_label == 'all') else f"AND sentiment_label = '{sentiment_label}'"
         sql = f"""
         SELECT
             sentiment_label,
             COUNT(*) as count
         FROM processed_sentiment_data
-        WHERE DATE(timestamp) BETWEEN '{start_date}' AND '{end_date}'
+        WHERE timestamp >= '{start_date} 00:00:00' AND timestamp <= '{end_date} 23:59:59'
+            {sentiment_filter}
         GROUP BY sentiment_label
         """
         
@@ -196,7 +253,7 @@ class DashboardDataProvider:
             COUNT(*) as count
         FROM processed_sentiment_data p
         JOIN raw_sentiment_data r ON p.record_id = r.record_id
-        WHERE DATE(p.timestamp) BETWEEN '{start_date}' AND '{end_date}'
+        WHERE p.timestamp >= '{start_date} 00:00:00' AND p.timestamp <= '{end_date} 23:59:59'
         GROUP BY r.source
         """
         
@@ -207,19 +264,38 @@ class DashboardDataProvider:
             return pd.DataFrame()
     
     def get_keyword_analysis(self, start_date: str, end_date: str) -> pd.DataFrame:
-        """Get keyword frequency analysis.
-        
-        Args:
-            start_date: Start date
-            end_date: End date
-            
-        Returns:
-            DataFrame with keyword counts
+        """Get keyword frequency analysis (SQLite-friendly)."""
+        sql = f"""
+        SELECT keywords_detected
+        FROM processed_sentiment_data
+        WHERE timestamp >= '{start_date} 00:00:00' AND timestamp <= '{end_date} 23:59:59'
         """
-        # Simplified - keywords stored as JSON string in SQLite
-        # Return empty for now
         try:
-            return pd.DataFrame(columns=['keyword', 'count'])
+            df = self.loader.query(sql)
+            if df.empty:
+                return pd.DataFrame()
+            all_keywords = []
+            for val in df['keywords_detected']:
+                if isinstance(val, list):
+                    all_keywords.extend(val)
+                elif isinstance(val, str):
+                    # Try JSON first
+                    parsed = None
+                    try:
+                        parsed = json.loads(val)
+                    except Exception:
+                        parsed = None
+                    if isinstance(parsed, list):
+                        all_keywords.extend([str(x) for x in parsed])
+                    else:
+                        # Fallback: comma-separated string
+                        parts = [p.strip() for p in val.split(',') if p.strip()]
+                        all_keywords.extend(parts)
+            if not all_keywords:
+                return pd.DataFrame()
+            counts = Counter([k.lower() for k in all_keywords if k])
+            top = counts.most_common(20)
+            return pd.DataFrame(top, columns=['keyword', 'count'])
         except Exception as e:
             log.error(f"Error getting keyword analysis: {str(e)}")
             return pd.DataFrame()
@@ -227,7 +303,8 @@ class DashboardDataProvider:
     def get_burnout_heatmap_data(
         self,
         start_date: str,
-        end_date: str
+        end_date: str,
+        risk_level: str = 'all'
     ) -> pd.DataFrame:
         """Get burnout risk data for heatmap.
         
@@ -238,14 +315,16 @@ class DashboardDataProvider:
         Returns:
             DataFrame with burnout risk by date and user
         """
+        risk_filter = "" if (not risk_level or risk_level == 'all') else f"AND risk_level = '{risk_level}'"
         sql = f"""
         SELECT
-            DATE(prediction_date) as date,
+            prediction_date as date,
             user_id_hash,
             burnout_risk_score,
             risk_level
         FROM burnout_predictions
-        WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
+        WHERE prediction_date >= '{start_date}' AND prediction_date <= '{end_date}'
+            {risk_filter}
         ORDER BY date, burnout_risk_score DESC
         LIMIT 1000
         """
@@ -269,7 +348,7 @@ class DashboardDataProvider:
         sql = f"""
         SELECT burnout_risk_score
         FROM burnout_predictions
-        WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
+        WHERE prediction_date >= '{start_date}' AND prediction_date <= '{end_date}'
         """
         
         try:
@@ -283,19 +362,51 @@ class DashboardDataProvider:
         start_date: str,
         end_date: str
     ) -> pd.DataFrame:
-        """Get top contributing factors to burnout.
+        """Get top contributing factors to burnout (SQLite-friendly).
         
-        Args:
-            start_date: Start date
-            end_date: End date
-            
-        Returns:
-            DataFrame with contributing factors
+        Reads `contributing_factors` as JSON array per row and aggregates
+        average importance per factor.
         """
-        # Simplified - contributing_factors stored as JSON in SQLite
-        # Return empty for now
+        sql = f"""
+        SELECT contributing_factors
+        FROM burnout_predictions
+        WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
+        """
         try:
-            return pd.DataFrame(columns=['factor_name', 'avg_importance'])
+            df = self.loader.query(sql)
+            if df.empty:
+                return pd.DataFrame()
+            bag = {}
+            cnt = {}
+            for val in df['contributing_factors']:
+                items = None
+                if isinstance(val, list):
+                    items = val
+                elif isinstance(val, str) and val:
+                    try:
+                        parsed = json.loads(val)
+                        if isinstance(parsed, list):
+                            items = parsed
+                    except Exception:
+                        items = None
+                if not items:
+                    continue
+                for it in items:
+                    if isinstance(it, dict):
+                        name = it.get('factor_name') or it.get('name')
+                        imp = it.get('importance_score') or it.get('importance') or 0
+                        if not name:
+                            continue
+                        bag[name] = bag.get(name, 0) + float(imp)
+                        cnt[name] = cnt.get(name, 0) + 1
+            if not bag:
+                return pd.DataFrame()
+            data = [
+                {'factor_name': k, 'avg_importance': bag[k] / max(1, cnt.get(k, 1))}
+                for k in bag.keys()
+            ]
+            out = pd.DataFrame(data).sort_values('avg_importance', ascending=False).head(10)
+            return out
         except Exception as e:
             log.error(f"Error getting contributing factors: {str(e)}")
             return pd.DataFrame()
@@ -312,11 +423,11 @@ class DashboardDataProvider:
         """
         sql = f"""
         SELECT
-            DATE(alert_timestamp) as date,
+            substr(alert_timestamp, 1, 10) as date,
             severity,
             COUNT(*) as count
         FROM alert_history
-        WHERE DATE(alert_timestamp) BETWEEN '{start_date}' AND '{end_date}'
+        WHERE alert_timestamp >= '{start_date} 00:00:00' AND alert_timestamp <= '{end_date} 23:59:59'
         GROUP BY date, severity
         ORDER BY date
         """
@@ -332,7 +443,7 @@ class DashboardDataProvider:
         sql = f"""
         SELECT COUNT(DISTINCT user_id_hash) as count
         FROM processed_sentiment_data
-        WHERE DATE(timestamp) BETWEEN '{start_date}' AND '{end_date}'
+        WHERE timestamp >= '{start_date} 00:00:00' AND timestamp <= '{end_date} 23:59:59'
         """
         
         try:
@@ -346,7 +457,7 @@ class DashboardDataProvider:
         sql = f"""
         SELECT COUNT(DISTINCT user_id_hash) as count
         FROM burnout_predictions
-        WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
+        WHERE prediction_date >= '{start_date}' AND prediction_date <= '{end_date}'
             AND risk_level IN ('high', 'critical')
         """
         
@@ -361,7 +472,7 @@ class DashboardDataProvider:
         sql = f"""
         SELECT AVG(sentiment_score) as avg_score
         FROM processed_sentiment_data
-        WHERE DATE(timestamp) BETWEEN '{start_date}' AND '{end_date}'
+        WHERE timestamp >= '{start_date} 00:00:00' AND timestamp <= '{end_date} 23:59:59'
         """
         
         try:
@@ -375,7 +486,7 @@ class DashboardDataProvider:
         sql = f"""
         SELECT COUNT(*) as count
         FROM alert_history
-        WHERE DATE(alert_timestamp) BETWEEN '{start_date}' AND '{end_date}'
+        WHERE alert_timestamp >= '{start_date} 00:00:00' AND alert_timestamp <= '{end_date} 23:59:59'
             AND status = 'sent'
         """
         
