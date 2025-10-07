@@ -21,7 +21,7 @@ class SurveyExtractor(BaseExtractor):
         self.survey_config = config.get('data_sources.surveys', {})
         self.employee_config = config.get('data_sources.employee_feedback', {})
     
-    def extract(self, source_type: str = 'api', **kwargs) -> List[Dict[str, Any]]:
+    def extract(self, source_type: str = None, **kwargs) -> List[Dict[str, Any]]:
         """Extract survey data from various sources.
         
         Args:
@@ -31,6 +31,16 @@ class SurveyExtractor(BaseExtractor):
         Returns:
             List of extracted survey records
         """
+        # Auto-detect source type from config if not specified
+        if source_type is None:
+            if self.employee_config.get('enabled', False):
+                source_type = self.employee_config.get('source_type', 'csv')
+            elif self.survey_config.get('enabled', False):
+                source_type = 'api'
+            else:
+                log.info("No survey sources enabled in config")
+                return []
+        
         if source_type == 'api':
             return self._extract_from_api(**kwargs)
         elif source_type == 'csv':

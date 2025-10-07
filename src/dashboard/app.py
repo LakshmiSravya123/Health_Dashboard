@@ -1,5 +1,12 @@
 """Main dashboard application using Plotly Dash."""
 
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
 import dash
 from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc

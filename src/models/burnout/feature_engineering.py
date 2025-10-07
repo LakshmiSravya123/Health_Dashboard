@@ -3,8 +3,9 @@
 from typing import List, Dict, Any
 import pandas as pd
 import numpy as np
+import json
 from datetime import datetime, timedelta
-from src.etl.loaders.bigquery_loader import BigQueryLoader
+from src.etl.loaders.database_loader import get_loader
 from src.utils.config_loader import get_config
 from src.utils.logger import log
 
@@ -15,7 +16,7 @@ class FeatureEngineer:
     def __init__(self):
         """Initialize feature engineer."""
         self.config = get_config()
-        self.loader = BigQueryLoader()
+        self.loader = get_loader()
         
         burnout_config = self.config.get_burnout_config()
         self.lookback_window = burnout_config.get('lookback_window', 30)
@@ -109,31 +110,18 @@ class FeatureEngineer:
         start_date: datetime,
         end_date: datetime
     ) -> pd.DataFrame:
-        """Get sentiment data for a user within date range.
+        """Get sentiment data for a user within date range (portable SQL)."""
+        # Default table name for portability
+        processed_table = 'processed_sentiment_data'
         
-        Args:
-            user_id_hash: User ID
-            start_date: Start date
-            end_date: End date
-            
-        Returns:
-            DataFrame of sentiment data
-        """
-        tables = self.loader.tables
-        processed_table = tables.get('processed_sentiment', 'processed_sentiment_data')
-        
-        sql = f"""
-        SELECT
-            timestamp,
-            sentiment_score,
-            sentiment_label,
-            mental_health_indicators
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.{processed_table}`
-        WHERE user_id_hash = '{user_id_hash}'
-            AND timestamp BETWEEN '{start_date.isoformat()}' AND '{end_date.isoformat()}'
-        ORDER BY timestamp
-        """
-        
+        # Use plain SQL compatible with SQLite and most warehouses
+        sql = (
+            "SELECT timestamp, sentiment_score, sentiment_label, mental_health_indicators "
+            f"FROM {processed_table} "
+            f"WHERE user_id_hash = '{user_id_hash}' "
+            f"AND timestamp BETWEEN '{start_date.isoformat()}' AND '{end_date.isoformat()}' "
+            "ORDER BY timestamp"
+        )
         return self.loader.query(sql)
     
     def _get_active_users(
@@ -142,29 +130,15 @@ class FeatureEngineer:
         end_date: datetime,
         min_posts: int
     ) -> List[str]:
-        """Get list of active users.
-        
-        Args:
-            start_date: Start date
-            end_date: End date
-            min_posts: Minimum number of posts
-            
-        Returns:
-            List of user ID hashes
-        """
-        tables = self.loader.tables
-        processed_table = tables.get('processed_sentiment', 'processed_sentiment_data')
-        
-        sql = f"""
-        SELECT user_id_hash
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.{processed_table}`
-        WHERE timestamp BETWEEN '{start_date.isoformat()}' AND '{end_date.isoformat()}'
-        GROUP BY user_id_hash
-        HAVING COUNT(*) >= {min_posts}
-        """
-        
+        """Get list of active users (portable SQL)."""
+        processed_table = 'processed_sentiment_data'
+        sql = (
+            f"SELECT user_id_hash FROM {processed_table} "
+            f"WHERE timestamp BETWEEN '{start_date.isoformat()}' AND '{end_date.isoformat()}' "
+            "GROUP BY user_id_hash HAVING COUNT(*) >= " + str(min_posts)
+        )
         df = self.loader.query(sql)
-        return df['user_id_hash'].tolist()
+        return df['user_id_hash'].tolist() if not df.empty else []
     
     def _compute_sentiment_features(self, df: pd.DataFrame) -> Dict[str, float]:
         """Compute sentiment-based features.
@@ -245,6 +219,12 @@ class FeatureEngineer:
             for _, row in df.iterrows():
                 if pd.notna(row['mental_health_indicators']):
                     indicator_data = row['mental_health_indicators']
+                    # Parse JSON string if necessary
+                    if isinstance(indicator_data, str):
+                        try:
+                            indicator_data = json.loads(indicator_data)
+                        except Exception:
+                            indicator_data = {}
                     if isinstance(indicator_data, dict):
                         score = indicator_data.get(f'{indicator}_score', 0)
                         scores.append(score)

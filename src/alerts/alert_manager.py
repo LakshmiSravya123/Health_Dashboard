@@ -6,7 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
 import pandas as pd
-from src.etl.loaders.bigquery_loader import BigQueryLoader
+from src.etl.loaders.database_loader import get_loader
 from src.utils.config_loader import get_config
 from src.utils.logger import log
 
@@ -17,7 +17,7 @@ class AlertManager:
     def __init__(self):
         """Initialize alert manager."""
         self.config = get_config()
-        self.loader = BigQueryLoader()
+        self.loader = get_loader()
         
         self.alert_config = self.config.get_alert_config()
         self.enabled = self.alert_config.get('enabled', True)
@@ -63,15 +63,12 @@ class AlertManager:
         Returns:
             DataFrame of predictions
         """
-        tables = self.loader.tables
-        predictions_table = tables.get('burnout_predictions', 'burnout_predictions')
-        
-        sql = f"""
-        SELECT *
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.{predictions_table}`
-        WHERE prediction_date = CURRENT_DATE()
-        """
-        
+        predictions_table = 'burnout_predictions'
+        # Portable approach: get the most recent prediction_date and return those rows
+        sql = (
+            f"SELECT * FROM {predictions_table} "
+            "WHERE prediction_date = (SELECT MAX(prediction_date) FROM burnout_predictions)"
+        )
         return self.loader.query(sql)
     
     def _check_rule(self, prediction: pd.Series, rule: Dict[str, Any]) -> bool:
@@ -113,24 +110,21 @@ class AlertManager:
         Returns:
             True if not in cooldown
         """
-        tables = self.loader.tables
-        alerts_table = tables.get('alerts', 'alert_history')
-        
+        alerts_table = 'alert_history'
         # Get rule cooldown
         rule = next((r for r in self.rules if r['name'] == rule_name), None)
         if not rule:
             return True
         
         cooldown_hours = rule.get('cooldown_hours', 24)
-        
-        sql = f"""
-        SELECT MAX(alert_timestamp) as last_alert
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.{alerts_table}`
-        WHERE user_id_hash = '{user_id_hash}'
-            AND alert_type = '{rule_name}'
-            AND alert_timestamp > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {cooldown_hours} HOUR)
-        """
-        
+        # SQLite-compatible time window using ISO8601 timestamps
+        sql = (
+            f"SELECT MAX(alert_timestamp) as last_alert FROM {alerts_table} "
+            f"WHERE user_id_hash = '{user_id_hash}' "
+            f"AND alert_type = '{rule_name}' "
+            f"AND alert_timestamp > datetime('now', '-{cooldown_hours} hours')"
+        )
+
         try:
             result = self.loader.query(sql)
             return result.empty or pd.isna(result.iloc[0]['last_alert'])
@@ -159,7 +153,15 @@ class AlertManager:
             'notes': None
         }
         
-        # Send through email
+        # Console/log alert (FREE) if enabled
+        if self.channels.get('console', {}).get('enabled', False):
+            log.warning(
+                f"[ALERT] {rule['name']} | Severity: {rule.get('severity','medium')} | "
+                f"User: {prediction.get('user_id_hash')} | Risk: {prediction.get('burnout_risk_score', 0):.2f}"
+            )
+            alert_data['channels_sent'].append('console')
+
+        # Send through email (optional)
         if self.channels.get('email', {}).get('enabled', False):
             try:
                 self._send_email_alert(prediction, rule)
