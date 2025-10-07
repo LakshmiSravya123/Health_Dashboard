@@ -183,7 +183,14 @@ class BurnoutPredictor:
         X_scaled = self.scaler.transform(X)
         
         # Predict
-        risk_scores = self.model.predict_proba(X_scaled)[:, 1]
+        proba = self.model.predict_proba(X_scaled)
+        # Handle both binary and multi-class cases
+        if proba.shape[1] == 1:
+            # Only one class predicted, use those probabilities
+            risk_scores = proba[:, 0]
+        else:
+            # Binary classification, use positive class probability
+            risk_scores = proba[:, 1]
         
         # Create predictions
         predictions = []
