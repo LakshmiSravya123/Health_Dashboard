@@ -1,0 +1,124 @@
+{
+  "raw_sentiment_data": {
+    "description": "Raw data extracted from various sources before processing",
+    "schema": [
+      {"name": "record_id", "type": "STRING", "mode": "REQUIRED", "description": "Unique identifier for the record"},
+      {"name": "user_id_hash", "type": "STRING", "mode": "REQUIRED", "description": "Anonymized user identifier"},
+      {"name": "source", "type": "STRING", "mode": "REQUIRED", "description": "Data source (twitter, reddit, survey, etc.)"},
+      {"name": "text_content", "type": "STRING", "mode": "NULLABLE", "description": "Raw text content"},
+      {"name": "timestamp", "type": "TIMESTAMP", "mode": "REQUIRED", "description": "When the content was created"},
+      {"name": "metadata", "type": "JSON", "mode": "NULLABLE", "description": "Additional metadata from source"},
+      {"name": "ingestion_timestamp", "type": "TIMESTAMP", "mode": "REQUIRED", "description": "When the record was ingested"},
+      {"name": "language", "type": "STRING", "mode": "NULLABLE", "description": "Detected language code"}
+    ],
+    "time_partitioning": {
+      "type": "DAY",
+      "field": "timestamp"
+    },
+    "clustering": ["source", "user_id_hash"]
+  },
+  
+  "processed_sentiment_data": {
+    "description": "Processed sentiment analysis results",
+    "schema": [
+      {"name": "record_id", "type": "STRING", "mode": "REQUIRED", "description": "Links to raw_sentiment_data"},
+      {"name": "user_id_hash", "type": "STRING", "mode": "REQUIRED", "description": "Anonymized user identifier"},
+      {"name": "timestamp", "type": "TIMESTAMP", "mode": "REQUIRED", "description": "Original content timestamp"},
+      {"name": "sentiment_score", "type": "FLOAT64", "mode": "REQUIRED", "description": "Sentiment score (0-1, negative to positive)"},
+      {"name": "sentiment_label", "type": "STRING", "mode": "REQUIRED", "description": "Sentiment category (very_negative, negative, neutral, positive, very_positive)"},
+      {"name": "confidence", "type": "FLOAT64", "mode": "REQUIRED", "description": "Model confidence score"},
+      {"name": "mental_health_indicators", "type": "RECORD", "mode": "NULLABLE", "description": "Detected mental health indicators", "fields": [
+        {"name": "stress_score", "type": "FLOAT64", "mode": "NULLABLE"},
+        {"name": "anxiety_score", "type": "FLOAT64", "mode": "NULLABLE"},
+        {"name": "depression_score", "type": "FLOAT64", "mode": "NULLABLE"},
+        {"name": "burnout_score", "type": "FLOAT64", "mode": "NULLABLE"}
+      ]},
+      {"name": "keywords_detected", "type": "STRING", "mode": "REPEATED", "description": "Mental health keywords found"},
+      {"name": "processing_timestamp", "type": "TIMESTAMP", "mode": "REQUIRED", "description": "When sentiment analysis was performed"},
+      {"name": "model_version", "type": "STRING", "mode": "REQUIRED", "description": "Version of the sentiment model used"}
+    ],
+    "time_partitioning": {
+      "type": "DAY",
+      "field": "timestamp"
+    },
+    "clustering": ["user_id_hash", "sentiment_label"]
+  },
+  
+  "user_features": {
+    "description": "Aggregated user features for burnout prediction",
+    "schema": [
+      {"name": "user_id_hash", "type": "STRING", "mode": "REQUIRED", "description": "Anonymized user identifier"},
+      {"name": "feature_date", "type": "DATE", "mode": "REQUIRED", "description": "Date for which features are calculated"},
+      {"name": "avg_sentiment_7d", "type": "FLOAT64", "mode": "NULLABLE", "description": "7-day rolling average sentiment"},
+      {"name": "avg_sentiment_30d", "type": "FLOAT64", "mode": "NULLABLE", "description": "30-day rolling average sentiment"},
+      {"name": "sentiment_volatility", "type": "FLOAT64", "mode": "NULLABLE", "description": "Standard deviation of sentiment"},
+      {"name": "negative_post_count_7d", "type": "INT64", "mode": "NULLABLE", "description": "Count of negative posts in last 7 days"},
+      {"name": "post_frequency", "type": "FLOAT64", "mode": "NULLABLE", "description": "Average posts per day"},
+      {"name": "engagement_level", "type": "FLOAT64", "mode": "NULLABLE", "description": "User engagement score"},
+      {"name": "stress_indicator_avg", "type": "FLOAT64", "mode": "NULLABLE", "description": "Average stress indicator score"},
+      {"name": "anxiety_indicator_avg", "type": "FLOAT64", "mode": "NULLABLE", "description": "Average anxiety indicator score"},
+      {"name": "depression_indicator_avg", "type": "FLOAT64", "mode": "NULLABLE", "description": "Average depression indicator score"},
+      {"name": "burnout_indicator_avg", "type": "FLOAT64", "mode": "NULLABLE", "description": "Average burnout indicator score"},
+      {"name": "weekend_activity_ratio", "type": "FLOAT64", "mode": "NULLABLE", "description": "Weekend vs weekday activity ratio"},
+      {"name": "late_night_activity_pct", "type": "FLOAT64", "mode": "NULLABLE", "description": "Percentage of activity between 11pm-5am"},
+      {"name": "sentiment_trend_7d", "type": "FLOAT64", "mode": "NULLABLE", "description": "7-day sentiment trend (slope)"},
+      {"name": "last_updated", "type": "TIMESTAMP", "mode": "REQUIRED", "description": "When features were last calculated"}
+    ],
+    "time_partitioning": {
+      "type": "DAY",
+      "field": "feature_date"
+    },
+    "clustering": ["user_id_hash"]
+  },
+  
+  "burnout_predictions": {
+    "description": "Burnout risk predictions for users",
+    "schema": [
+      {"name": "prediction_id", "type": "STRING", "mode": "REQUIRED", "description": "Unique prediction identifier"},
+      {"name": "user_id_hash", "type": "STRING", "mode": "REQUIRED", "description": "Anonymized user identifier"},
+      {"name": "prediction_date", "type": "DATE", "mode": "REQUIRED", "description": "Date of prediction"},
+      {"name": "prediction_timestamp", "type": "TIMESTAMP", "mode": "REQUIRED", "description": "When prediction was made"},
+      {"name": "burnout_risk_score", "type": "FLOAT64", "mode": "REQUIRED", "description": "Burnout risk score (0-1)"},
+      {"name": "risk_level", "type": "STRING", "mode": "REQUIRED", "description": "Risk category (low, medium, high, critical)"},
+      {"name": "confidence_interval", "type": "RECORD", "mode": "NULLABLE", "description": "Prediction confidence interval", "fields": [
+        {"name": "lower_bound", "type": "FLOAT64", "mode": "REQUIRED"},
+        {"name": "upper_bound", "type": "FLOAT64", "mode": "REQUIRED"}
+      ]},
+      {"name": "contributing_factors", "type": "RECORD", "mode": "REPEATED", "description": "Top factors contributing to risk", "fields": [
+        {"name": "factor_name", "type": "STRING", "mode": "REQUIRED"},
+        {"name": "importance_score", "type": "FLOAT64", "mode": "REQUIRED"}
+      ]},
+      {"name": "prediction_horizon_days", "type": "INT64", "mode": "REQUIRED", "description": "Days ahead for prediction"},
+      {"name": "model_version", "type": "STRING", "mode": "REQUIRED", "description": "Version of the prediction model"},
+      {"name": "model_type", "type": "STRING", "mode": "REQUIRED", "description": "Type of model used"}
+    ],
+    "time_partitioning": {
+      "type": "DAY",
+      "field": "prediction_date"
+    },
+    "clustering": ["user_id_hash", "risk_level"]
+  },
+  
+  "alert_history": {
+    "description": "History of alerts sent to users or administrators",
+    "schema": [
+      {"name": "alert_id", "type": "STRING", "mode": "REQUIRED", "description": "Unique alert identifier"},
+      {"name": "user_id_hash", "type": "STRING", "mode": "REQUIRED", "description": "Anonymized user identifier"},
+      {"name": "alert_timestamp", "type": "TIMESTAMP", "mode": "REQUIRED", "description": "When alert was triggered"},
+      {"name": "alert_type", "type": "STRING", "mode": "REQUIRED", "description": "Type of alert"},
+      {"name": "severity", "type": "STRING", "mode": "REQUIRED", "description": "Alert severity (low, medium, high, critical)"},
+      {"name": "trigger_condition", "type": "STRING", "mode": "REQUIRED", "description": "Condition that triggered the alert"},
+      {"name": "trigger_value", "type": "FLOAT64", "mode": "NULLABLE", "description": "Value that triggered the alert"},
+      {"name": "channels_sent", "type": "STRING", "mode": "REPEATED", "description": "Channels alert was sent to (email, slack, sms)"},
+      {"name": "status", "type": "STRING", "mode": "REQUIRED", "description": "Alert status (sent, failed, acknowledged)"},
+      {"name": "acknowledged_timestamp", "type": "TIMESTAMP", "mode": "NULLABLE", "description": "When alert was acknowledged"},
+      {"name": "acknowledged_by", "type": "STRING", "mode": "NULLABLE", "description": "Who acknowledged the alert"},
+      {"name": "notes", "type": "STRING", "mode": "NULLABLE", "description": "Additional notes or actions taken"}
+    ],
+    "time_partitioning": {
+      "type": "DAY",
+      "field": "alert_timestamp"
+    },
+    "clustering": ["user_id_hash", "severity"]
+  }
+}

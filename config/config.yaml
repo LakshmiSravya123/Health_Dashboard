@@ -1,0 +1,262 @@
+# Mental Health Dashboard Configuration
+
+# Data Warehouse Configuration
+# Choose one: 'bigquery', 'snowflake', 'sqlite' (free local option)
+warehouse_type: "sqlite"  # Default to free SQLite
+
+# BigQuery Configuration (FREE tier: 1TB queries/month, 10GB storage)
+bigquery:
+  enabled: false
+  project_id: "your-gcp-project-id"
+  dataset_id: "mental_health_analytics"
+  location: "US"
+  credentials_path: "${GOOGLE_APPLICATION_CREDENTIALS}"
+  
+  # Table names
+  tables:
+    raw_sentiment: "raw_sentiment_data"
+    processed_sentiment: "processed_sentiment_data"
+    user_features: "user_features"
+    burnout_predictions: "burnout_predictions"
+    alerts: "alert_history"
+
+# Snowflake Configuration (FREE trial: 30 days, $400 credits)
+snowflake:
+  enabled: false
+  account: "your-account"
+  user: "your-user"
+  password: "${SNOWFLAKE_PASSWORD}"
+  warehouse: "COMPUTE_WH"
+  database: "MENTAL_HEALTH_DB"
+  schema: "ANALYTICS"
+
+# SQLite Configuration (100% FREE - Local database)
+sqlite:
+  enabled: true
+  database_path: "data/mental_health.db"
+  
+  # Table names
+  tables:
+    raw_sentiment: "raw_sentiment_data"
+    processed_sentiment: "processed_sentiment_data"
+    user_features: "user_features"
+    burnout_predictions: "burnout_predictions"
+    alerts: "alert_history"
+
+# Data Sources (ALL FREE OPTIONS)
+data_sources:
+  # Twitter - DISABLED (requires paid API access as of 2023)
+  twitter:
+    enabled: false
+    api_key: "${TWITTER_API_KEY}"
+    api_secret: "${TWITTER_API_SECRET}"
+    bearer_token: "${TWITTER_BEARER_TOKEN}"
+    keywords:
+      - "mental health"
+      - "burnout"
+      - "stress"
+      - "anxiety"
+      - "depression"
+      - "work life balance"
+    max_results: 100
+    
+  # Reddit - FREE (no API key required for read-only)
+  reddit:
+    enabled: false  # Disabled by default, enable if you want Reddit data
+    client_id: "${REDDIT_CLIENT_ID}"
+    client_secret: "${REDDIT_CLIENT_SECRET}"
+    user_agent: "MentalHealthDashboard/1.0"
+    subreddits:
+      - "mentalhealth"
+      - "depression"
+      - "anxiety"
+      - "burnout"
+      - "stress"
+  
+  # CSV/Local Files - 100% FREE
+  local_files:
+    enabled: true
+    source_type: "csv"
+    path: "data/sample_survey_data.csv"
+    
+  # Employee Feedback - 100% FREE
+  employee_feedback:
+    enabled: true
+    source_type: "csv"
+    path: "data/employee_feedback.csv"
+
+# NLP & Sentiment Analysis
+sentiment_analysis:
+  model_type: "transformer"  # transformer, vader, textblob
+  transformer_model: "distilbert-base-uncased-finetuned-sst-2-english"
+  batch_size: 32
+  max_length: 512
+  
+  # Sentiment thresholds
+  thresholds:
+    very_negative: 0.2
+    negative: 0.4
+    neutral: 0.6
+    positive: 0.8
+    very_positive: 1.0
+  
+  # Mental health specific keywords
+  mental_health_keywords:
+    stress: ["stress", "stressed", "overwhelming", "pressure"]
+    anxiety: ["anxiety", "anxious", "worried", "panic"]
+    depression: ["depression", "depressed", "hopeless", "sad"]
+    burnout: ["burnout", "exhausted", "drained", "overwhelmed"]
+
+# Burnout Prediction Model
+burnout_prediction:
+  model_type: "ensemble"  # lstm, prophet, xgboost, ensemble
+  features:
+    - sentiment_score
+    - sentiment_volatility
+    - negative_post_frequency
+    - engagement_level
+    - time_of_day_patterns
+    - weekend_activity
+    - response_time
+  
+  # Risk thresholds
+  risk_levels:
+    low: 0.3
+    medium: 0.6
+    high: 0.8
+    critical: 0.9
+  
+  # Model parameters
+  lookback_window: 30  # days
+  prediction_horizon: 7  # days
+  retrain_frequency: 7  # days
+
+# Alert System (FREE OPTIONS)
+alerts:
+  enabled: true
+  
+  # Alert channels
+  channels:
+    # Console/Log alerts - 100% FREE
+    console:
+      enabled: true
+    
+    # Email - FREE (using Gmail with app password)
+    email:
+      enabled: false  # Disabled by default
+      smtp_server: "smtp.gmail.com"
+      smtp_port: 587
+      sender_email: "${ALERT_EMAIL}"
+      sender_password: "${ALERT_EMAIL_PASSWORD}"
+    
+    # Slack - FREE (webhook)
+    slack:
+      enabled: false
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+    
+    # SMS - PAID (disabled by default)
+    sms:
+      enabled: false
+      twilio_account_sid: "${TWILIO_ACCOUNT_SID}"
+      twilio_auth_token: "${TWILIO_AUTH_TOKEN}"
+      twilio_phone_number: "${TWILIO_PHONE_NUMBER}"
+  
+  # Alert rules
+  rules:
+    - name: "Critical Burnout Risk"
+      condition: "burnout_risk >= 0.9"
+      severity: "critical"
+      cooldown_hours: 24
+      
+    - name: "High Burnout Risk"
+      condition: "burnout_risk >= 0.8"
+      severity: "high"
+      cooldown_hours: 48
+      
+    - name: "Sustained Negative Sentiment"
+      condition: "avg_sentiment_7d < 0.3"
+      severity: "medium"
+      cooldown_hours: 72
+      
+    - name: "Sentiment Deterioration"
+      condition: "sentiment_change_7d < -0.3"
+      severity: "medium"
+      cooldown_hours: 72
+
+# Dashboard Configuration
+dashboard:
+  host: "0.0.0.0"
+  port: 8050
+  debug: false
+  
+  # Refresh intervals (seconds)
+  refresh_intervals:
+    realtime_metrics: 30
+    trends: 300
+    predictions: 600
+  
+  # Visualization settings
+  theme: "plotly_white"
+  color_scheme:
+    critical: "#d32f2f"
+    high: "#f57c00"
+    medium: "#fbc02d"
+    low: "#388e3c"
+    neutral: "#757575"
+
+# ETL Pipeline
+etl:
+  schedule: "0 */6 * * *"  # Every 6 hours (cron format)
+  batch_size: 1000
+  max_retries: 3
+  retry_delay: 300  # seconds
+  
+  # Data retention
+  retention:
+    raw_data_days: 90
+    processed_data_days: 365
+    predictions_days: 180
+
+# Privacy & Security
+privacy:
+  anonymization:
+    enabled: true
+    hash_algorithm: "sha256"
+    salt: "${ANONYMIZATION_SALT}"
+  
+  pii_detection:
+    enabled: true
+    redact_patterns:
+      - email
+      - phone
+      - ssn
+      - credit_card
+  
+  data_encryption:
+    enabled: true
+    algorithm: "AES-256"
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "json"
+  output:
+    - console
+    - file
+  file_path: "logs/dashboard.log"
+  rotation: "1 day"
+  retention: "30 days"
+
+# Monitoring
+monitoring:
+  enabled: true
+  prometheus_port: 9090
+  sentry_dsn: "${SENTRY_DSN}"
+  
+  # Performance metrics
+  track_metrics:
+    - pipeline_duration
+    - model_inference_time
+    - api_response_time
+    - error_rate
+    - data_quality_score
