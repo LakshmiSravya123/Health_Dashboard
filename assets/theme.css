@@ -1,0 +1,23 @@
+/* Simple light/dark theme */
+
+/* Default (light) */
+body, .container, .card, .dbc, .dash-bootstrap {
+  background-color: #f8fafc;
+  color: #2d3748;
+}
+
+/* Dark theme wrapper */
+.dark {
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+.dark .card, .dark .dbc, .dark .dash-bootstrap, .dark .container {
+  background-color: #111827 !important;
+  color: #e5e7eb !important;
+  border-color: #1f2937 !important;
+}
+.dark .text-muted { color: #9ca3af !important; }
+.dark .btn-primary { background-color: #4f46e5 !important; border: none; }
+.dark .btn-warning { background-color: #f59e0b !important; border: none; }
+.dark .btn-danger { background-color: #ef4444 !important; border: none; }
+.dark .btn-success { background-color: #10b981 !important; border: none; }

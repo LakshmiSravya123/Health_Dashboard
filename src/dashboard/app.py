@@ -33,8 +33,8 @@ class MentalHealthDashboard:
             suppress_callback_exceptions=True
         )
         
-        # Set layout
-        self.app.layout = create_layout()
+        # Set layout wrapped in a root div to toggle themes
+        self.app.layout = html.Div(id='app-root', children=[create_layout()])
         
         # Register callbacks
         register_callbacks(self.app)

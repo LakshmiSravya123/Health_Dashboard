@@ -91,3 +91,4 @@ Thumbs.db
 *.temp
 tmp/
 temp/
+.vercel
