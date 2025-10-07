@@ -1,0 +1,92 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Credentials
+*.json
+!config/bigquery_schema.json
+credentials/
+service-account-key.json
+
+# Logs
+logs/*
+!logs/.gitkeep
+*.log
+
+# Data files
+data/*
+!data/.gitkeep
+!data/sample_data.csv
+
+# Model artifacts
+models/*.pkl
+models/*.h5
+models/*.pt
+models/*.pth
+*.ckpt
+
+# Cache
+.cache/
+*.cache
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Airflow
+airflow.db
+airflow.cfg
+airflow-webserver.pid
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
