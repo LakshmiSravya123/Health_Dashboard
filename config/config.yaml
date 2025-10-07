@@ -75,15 +75,15 @@ data_sources:
   
   # CSV/Local Files - 100% FREE
   local_files:
-    enabled: true
+    enabled: false
     source_type: "csv"
     path: "data/sample_survey_data.csv"
     
-  # Employee Feedback - 100% FREE
+  # Employee Feedback - 100% FREE (uses sample data)
   employee_feedback:
     enabled: true
     source_type: "csv"
-    path: "data/employee_feedback.csv"
+    path: "data/sample_survey_data.csv"
 
 # NLP & Sentiment Analysis
 sentiment_analysis:

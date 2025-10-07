@@ -59,28 +59,38 @@ def create_header():
     """
     return dbc.Row([
         dbc.Col([
-            html.H1([
-                html.I(className="fas fa-brain me-3"),
-                "Mental Health Dashboard"
-            ], className="text-primary"),
-            html.P(
-                "Real-time sentiment analysis and burnout prediction for proactive mental health care",
-                className="text-muted"
-            )
+            html.Div([
+                html.H1([
+                    html.I(className="fas fa-brain me-3", style={'color': '#667eea'}),
+                    "Mental Health Analytics"
+                ], style={'color': '#2d3748', 'fontWeight': '700', 'marginBottom': '0.5rem'}),
+                html.P(
+                    "AI-powered sentiment analysis and burnout prediction for proactive mental health care",
+                    style={'color': '#718096', 'fontSize': '1.1rem'}
+                )
+            ])
         ], width=8),
         dbc.Col([
             html.Div([
                 html.P([
-                    html.I(className="fas fa-clock me-2"),
-                    html.Span(id="last-updated", children=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                ], className="text-end mb-1"),
+                    html.I(className="fas fa-clock me-2", style={'color': '#667eea'}),
+                    html.Span(id="last-updated", children=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                             style={'color': '#4a5568'})
+                ], className="text-end mb-2"),
                 dbc.Button([
                     html.I(className="fas fa-sync-alt me-2"),
-                    "Refresh"
-                ], id="refresh-button", color="primary", size="sm", className="float-end")
+                    "Refresh Data"
+                ], id="refresh-button", 
+                   style={'background': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          'border': 'none',
+                          'boxShadow': '0 4px 6px rgba(102, 126, 234, 0.4)'},
+                   size="sm", className="float-end")
             ])
         ], width=4)
-    ])
+    ], style={'marginBottom': '2rem', 'padding': '1.5rem', 
+              'background': 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+              'borderRadius': '15px',
+              'boxShadow': '0 10px 25px rgba(0,0,0,0.1)'})
 
 
 def create_sidebar():
@@ -374,12 +384,25 @@ def create_metric_card(title, value_id, icon, color):
     Returns:
         Metric card component
     """
+    color_map = {
+        'primary': '#667eea',
+        'danger': '#f56565',
+        'success': '#48bb78',
+        'warning': '#ed8936'
+    }
+    
     return dbc.Card([
         dbc.CardBody([
             html.Div([
-                html.I(className=f"{icon} fa-2x text-{color} mb-2"),
-                html.H3(id=value_id, children="--", className="mb-0"),
-                html.P(title, className="text-muted mb-0")
-            ], className="text-center")
+                html.I(className=f"{icon} fa-3x mb-3", 
+                      style={'color': color_map.get(color, '#667eea')}),
+                html.H2(id=value_id, children="--", 
+                       style={'fontWeight': '700', 'color': '#2d3748', 'marginBottom': '0.5rem'}),
+                html.P(title, style={'color': '#718096', 'fontSize': '0.9rem', 'marginBottom': '0'})
+            ], className="text-center", style={'padding': '1rem'})
         ])
-    ], className="shadow-sm")
+    ], style={'borderRadius': '15px',
+              'border': 'none',
+              'boxShadow': '0 4px 15px rgba(0,0,0,0.1)',
+              'transition': 'transform 0.3s ease',
+              'background': 'white'})

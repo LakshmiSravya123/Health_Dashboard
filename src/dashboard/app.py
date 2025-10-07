@@ -49,7 +49,7 @@ class MentalHealthDashboard:
     def run(self):
         """Run the dashboard server."""
         log.info(f"Starting dashboard on {self.host}:{self.port}")
-        self.app.run_server(
+        self.app.run(
             host=self.host,
             port=self.port,
             debug=self.debug

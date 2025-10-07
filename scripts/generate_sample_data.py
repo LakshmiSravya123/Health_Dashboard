@@ -16,8 +16,8 @@ def main():
     
     extractor = SurveyExtractor()
     
-    # Create sample data
-    file_path = extractor.create_sample_data(num_records=200)
+    # Create sample data with more records for better visualization
+    file_path = extractor.create_sample_data(num_records=500)
     
     log.info(f"Sample data created at: {file_path}")
     log.info("You can now run the ETL pipeline to load this data")

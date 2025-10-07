@@ -33,9 +33,13 @@ def main():
     pipeline = ETLPipeline()
     etl_summary = pipeline.run()
     
-    if etl_summary['records_loaded'] == 0:
-        log.warning("No data loaded. Pipeline stopped.")
+    # Check if we have any data at all (new or existing)
+    if etl_summary['records_extracted'] == 0:
+        log.warning("No data extracted. Pipeline stopped.")
         return
+    
+    if etl_summary['records_loaded'] == 0:
+        log.info("Data already exists in database, continuing with processing...")
     
     # Step 2: Process Sentiment
     log.info("\n[2/5] Processing Sentiment Analysis...")

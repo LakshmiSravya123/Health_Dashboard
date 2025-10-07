@@ -88,15 +88,14 @@ class PredictionProcessor:
         Returns:
             DataFrame of user features
         """
-        tables = self.loader.tables
-        features_table = tables.get('user_features', 'user_features')
+        features_table = 'user_features'
         
         sql = f"""
         SELECT *
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.{features_table}`
+        FROM {features_table}
         WHERE feature_date = (
             SELECT MAX(feature_date)
-            FROM `{self.loader.project_id}.{self.loader.dataset_id}.{features_table}`
+            FROM {features_table}
         )
         """
         

@@ -244,7 +244,7 @@ class DashboardDataProvider:
             user_id_hash,
             burnout_risk_score,
             risk_level
-        FROM {self.loader.project_id}.{self.loader.dataset_id}.burnout_predictions
+        FROM burnout_predictions
         WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
         ORDER BY date, burnout_risk_score DESC
         LIMIT 1000
@@ -268,7 +268,7 @@ class DashboardDataProvider:
         """
         sql = f"""
         SELECT burnout_risk_score
-        FROM {self.loader.project_id}.{self.loader.dataset_id}.burnout_predictions
+        FROM burnout_predictions
         WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
         """
         
@@ -292,22 +292,10 @@ class DashboardDataProvider:
         Returns:
             DataFrame with contributing factors
         """
-        # This would need to aggregate from the nested contributing_factors field
-        # Simplified version for demonstration
-        sql = f"""
-        SELECT
-            factor.factor_name,
-            AVG(factor.importance_score) as avg_importance
-        FROM {self.loader.project_id}.{self.loader.dataset_id}.burnout_predictions,
-        UNNEST(contributing_factors) as factor
-        WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
-        GROUP BY factor.factor_name
-        ORDER BY avg_importance DESC
-        LIMIT 10
-        """
-        
+        # Simplified - contributing_factors stored as JSON in SQLite
+        # Return empty for now
         try:
-            return self.loader.query(sql)
+            return pd.DataFrame(columns=['factor_name', 'avg_importance'])
         except Exception as e:
             log.error(f"Error getting contributing factors: {str(e)}")
             return pd.DataFrame()
@@ -327,7 +315,7 @@ class DashboardDataProvider:
             DATE(alert_timestamp) as date,
             severity,
             COUNT(*) as count
-        FROM {self.loader.project_id}.{self.loader.dataset_id}.alert_history
+        FROM alert_history
         WHERE DATE(alert_timestamp) BETWEEN '{start_date}' AND '{end_date}'
         GROUP BY date, severity
         ORDER BY date
@@ -343,7 +331,7 @@ class DashboardDataProvider:
         """Query total unique users."""
         sql = f"""
         SELECT COUNT(DISTINCT user_id_hash) as count
-        FROM {self.loader.project_id}.{self.loader.dataset_id}.processed_sentiment_data
+        FROM processed_sentiment_data
         WHERE DATE(timestamp) BETWEEN '{start_date}' AND '{end_date}'
         """
         
@@ -357,7 +345,7 @@ class DashboardDataProvider:
         """Query high risk users count."""
         sql = f"""
         SELECT COUNT(DISTINCT user_id_hash) as count
-        FROM {self.loader.project_id}.{self.loader.dataset_id}.burnout_predictions
+        FROM burnout_predictions
         WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
             AND risk_level IN ('high', 'critical')
         """
@@ -372,7 +360,7 @@ class DashboardDataProvider:
         """Query average sentiment score."""
         sql = f"""
         SELECT AVG(sentiment_score) as avg_score
-        FROM {self.loader.project_id}.{self.loader.dataset_id}.processed_sentiment_data
+        FROM processed_sentiment_data
         WHERE DATE(timestamp) BETWEEN '{start_date}' AND '{end_date}'
         """
         
@@ -386,7 +374,7 @@ class DashboardDataProvider:
         """Query active alerts count."""
         sql = f"""
         SELECT COUNT(*) as count
-        FROM {self.loader.project_id}.{self.loader.dataset_id}.alert_history
+        FROM alert_history
         WHERE DATE(alert_timestamp) BETWEEN '{start_date}' AND '{end_date}'
             AND status = 'sent'
         """
