@@ -46,6 +46,7 @@ env/
 # Credentials
 *.json
 !config/bigquery_schema.json
+!vercel.json
 credentials/
 service-account-key.json
 
