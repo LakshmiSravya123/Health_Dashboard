@@ -3,7 +3,7 @@
 import pandas as pd
 from datetime import datetime
 from typing import Dict, Any, List
-from src.etl.loaders.bigquery_loader import BigQueryLoader
+from src.etl.loaders.database_loader import get_loader
 from src.utils.logger import log
 
 
@@ -12,7 +12,7 @@ class DashboardDataProvider:
     
     def __init__(self):
         """Initialize data provider."""
-        self.loader = BigQueryLoader()
+        self.loader = get_loader()
     
     def get_key_metrics(self, start_date: str, end_date: str) -> Dict[str, Any]:
         """Get key metrics for overview.
@@ -78,9 +78,8 @@ class DashboardDataProvider:
             DATE(p.timestamp) as date,
             AVG(p.sentiment_score) as avg_sentiment,
             COUNT(*) as post_count
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.processed_sentiment_data` p
-        JOIN `{self.loader.project_id}.{self.loader.dataset_id}.raw_sentiment_data` r
-            ON p.record_id = r.record_id
+        FROM processed_sentiment_data p
+        JOIN raw_sentiment_data r ON p.record_id = r.record_id
         WHERE DATE(p.timestamp) BETWEEN '{start_date}' AND '{end_date}'
             {sources_filter}
         GROUP BY date
@@ -107,7 +106,7 @@ class DashboardDataProvider:
         SELECT
             risk_level,
             COUNT(*) as count
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.burnout_predictions`
+        FROM burnout_predictions
         WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
         GROUP BY risk_level
         ORDER BY
@@ -139,22 +138,10 @@ class DashboardDataProvider:
         Returns:
             DataFrame with indicator trends
         """
-        # Note: This is a simplified version. In production, you'd extract from JSON
-        sql = f"""
-        SELECT
-            DATE(timestamp) as date,
-            AVG(CAST(JSON_EXTRACT_SCALAR(mental_health_indicators, '$.stress_score') AS FLOAT64)) as stress,
-            AVG(CAST(JSON_EXTRACT_SCALAR(mental_health_indicators, '$.anxiety_score') AS FLOAT64)) as anxiety,
-            AVG(CAST(JSON_EXTRACT_SCALAR(mental_health_indicators, '$.depression_score') AS FLOAT64)) as depression,
-            AVG(CAST(JSON_EXTRACT_SCALAR(mental_health_indicators, '$.burnout_score') AS FLOAT64)) as burnout
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.processed_sentiment_data`
-        WHERE DATE(timestamp) BETWEEN '{start_date}' AND '{end_date}'
-        GROUP BY date
-        ORDER BY date
-        """
-        
+        # Simplified - returns empty for now (JSON parsing complex in SQLite)
+        # TODO: Implement JSON parsing for SQLite if needed
         try:
-            return self.loader.query(sql)
+            return pd.DataFrame(columns=['date', 'stress', 'anxiety', 'depression', 'burnout'])
         except Exception as e:
             log.error(f"Error getting mental health indicators: {str(e)}")
             return pd.DataFrame()
@@ -177,7 +164,7 @@ class DashboardDataProvider:
         SELECT
             sentiment_label,
             COUNT(*) as count
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.processed_sentiment_data`
+        FROM processed_sentiment_data
         WHERE DATE(timestamp) BETWEEN '{start_date}' AND '{end_date}'
         GROUP BY sentiment_label
         """
@@ -207,9 +194,8 @@ class DashboardDataProvider:
             r.source,
             AVG(p.sentiment_score) as avg_sentiment,
             COUNT(*) as count
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.processed_sentiment_data` p
-        JOIN `{self.loader.project_id}.{self.loader.dataset_id}.raw_sentiment_data` r
-            ON p.record_id = r.record_id
+        FROM processed_sentiment_data p
+        JOIN raw_sentiment_data r ON p.record_id = r.record_id
         WHERE DATE(p.timestamp) BETWEEN '{start_date}' AND '{end_date}'
         GROUP BY r.source
         """
@@ -230,20 +216,10 @@ class DashboardDataProvider:
         Returns:
             DataFrame with keyword counts
         """
-        sql = f"""
-        SELECT
-            keyword,
-            COUNT(*) as count
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.processed_sentiment_data`,
-        UNNEST(keywords_detected) as keyword
-        WHERE DATE(timestamp) BETWEEN '{start_date}' AND '{end_date}'
-        GROUP BY keyword
-        ORDER BY count DESC
-        LIMIT 20
-        """
-        
+        # Simplified - keywords stored as JSON string in SQLite
+        # Return empty for now
         try:
-            return self.loader.query(sql)
+            return pd.DataFrame(columns=['keyword', 'count'])
         except Exception as e:
             log.error(f"Error getting keyword analysis: {str(e)}")
             return pd.DataFrame()
@@ -268,7 +244,7 @@ class DashboardDataProvider:
             user_id_hash,
             burnout_risk_score,
             risk_level
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.burnout_predictions`
+        FROM {self.loader.project_id}.{self.loader.dataset_id}.burnout_predictions
         WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
         ORDER BY date, burnout_risk_score DESC
         LIMIT 1000
@@ -292,7 +268,7 @@ class DashboardDataProvider:
         """
         sql = f"""
         SELECT burnout_risk_score
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.burnout_predictions`
+        FROM {self.loader.project_id}.{self.loader.dataset_id}.burnout_predictions
         WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
         """
         
@@ -322,7 +298,7 @@ class DashboardDataProvider:
         SELECT
             factor.factor_name,
             AVG(factor.importance_score) as avg_importance
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.burnout_predictions`,
+        FROM {self.loader.project_id}.{self.loader.dataset_id}.burnout_predictions,
         UNNEST(contributing_factors) as factor
         WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
         GROUP BY factor.factor_name
@@ -351,7 +327,7 @@ class DashboardDataProvider:
             DATE(alert_timestamp) as date,
             severity,
             COUNT(*) as count
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.alert_history`
+        FROM {self.loader.project_id}.{self.loader.dataset_id}.alert_history
         WHERE DATE(alert_timestamp) BETWEEN '{start_date}' AND '{end_date}'
         GROUP BY date, severity
         ORDER BY date
@@ -367,7 +343,7 @@ class DashboardDataProvider:
         """Query total unique users."""
         sql = f"""
         SELECT COUNT(DISTINCT user_id_hash) as count
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.processed_sentiment_data`
+        FROM {self.loader.project_id}.{self.loader.dataset_id}.processed_sentiment_data
         WHERE DATE(timestamp) BETWEEN '{start_date}' AND '{end_date}'
         """
         
@@ -381,7 +357,7 @@ class DashboardDataProvider:
         """Query high risk users count."""
         sql = f"""
         SELECT COUNT(DISTINCT user_id_hash) as count
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.burnout_predictions`
+        FROM {self.loader.project_id}.{self.loader.dataset_id}.burnout_predictions
         WHERE DATE(prediction_date) BETWEEN '{start_date}' AND '{end_date}'
             AND risk_level IN ('high', 'critical')
         """
@@ -396,7 +372,7 @@ class DashboardDataProvider:
         """Query average sentiment score."""
         sql = f"""
         SELECT AVG(sentiment_score) as avg_score
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.processed_sentiment_data`
+        FROM {self.loader.project_id}.{self.loader.dataset_id}.processed_sentiment_data
         WHERE DATE(timestamp) BETWEEN '{start_date}' AND '{end_date}'
         """
         
@@ -410,7 +386,7 @@ class DashboardDataProvider:
         """Query active alerts count."""
         sql = f"""
         SELECT COUNT(*) as count
-        FROM `{self.loader.project_id}.{self.loader.dataset_id}.alert_history`
+        FROM {self.loader.project_id}.{self.loader.dataset_id}.alert_history
         WHERE DATE(alert_timestamp) BETWEEN '{start_date}' AND '{end_date}'
             AND status = 'sent'
         """
