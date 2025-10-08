@@ -5,6 +5,7 @@
 An interactive dashboard for analyzing mental health sentiment trends and predicting burnout risks using **free tools**: SQLite/BigQuery free tier, NLP, and machine learning. No paid APIs required!
 
 **Perfect for**: Students, researchers, small organizations, and anyone wanting to analyze mental health data without cost.
+https://health-dashboard-1-pytr.onrender.com/
 
 ## Key Features (All FREE)
 - 🧠 **NLP Sentiment Analysis**: BERT-based analysis (no API key needed)
