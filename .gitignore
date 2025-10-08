@@ -59,6 +59,7 @@ logs/*
 data/*
 !data/.gitkeep
 !data/sample_data.csv
+!data/demo_*.csv
 
 # Model artifacts
 models/*.pkl
