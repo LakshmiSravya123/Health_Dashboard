@@ -34,7 +34,7 @@ def get_chart_generator():
     """Lazy singleton for chart generator."""
     global _chart_gen
     if _chart_gen is None:
-        from src.dashboard.chart_generator import ChartGenerator
+        from src.dashboard.charts import ChartGenerator
         _chart_gen = ChartGenerator()
     return _chart_gen
 
